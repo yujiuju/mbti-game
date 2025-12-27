@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 移动端适配：禁止缩放，确保触摸交互正常 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- iOS特定设置：启用全屏模式，状态栏透明 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>MBTI 角色连线</title>
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", "Arial Bold", sans-serif;
+        }
+
+        /* 页面主体：垂直居中布局，渐变背景 */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #4a7c59 0%, #81b29a 50%, #f2cc8f 100%);
+            padding: 10px;
+            background-attachment: fixed;
+            overflow: hidden;
+            position: relative;
+            -webkit-tap-highlight-color: transparent; /* 清除移动端点击高亮 */
+        }
+
+        /* 游戏标题 */
+        .game-title {
+            text-align: center;
+            font-size: clamp(28px, 6vw, 40px);
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+            margin: 15px 0 25px;
+            background: rgba(74, 124, 89, 0.7);
+            padding: 10px 20px;
+            border-radius: 12px;
+            letter-spacing: 2px;
+            z-index: 10;
+            position: relative;
+        }
+
+        /* 游戏主容器 */
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 850px;
+            height: 70vh;
+            background: rgba(255, 255, 255, 0.95);
+            border: 3px solid #4a7c59;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        /* 容器背景遮罩 */
+        .game-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://picsum.photos/id/142/850/600') center/cover no-repeat;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        /* 左右容器包装 */
+        .items-wrapper {
+            display: flex;
+            height: 100%;
+            padding: 15px 10px;
+            gap: clamp(15px, 4vw, 25px);
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 左右选项栏 */
+        .left-items, .right-items {
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+            width: clamp(90px, 18vw, 140px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        /* 选项卡片基础样式 */
+        .item-card {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px 8px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: linear-gradient(90deg, #81b29a 0%, #4a7c59 100%);
+            border-radius: 10px;
+            font-size: clamp(14px, 2.5vw, 16px);
+            font-weight: bold;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            position: relative;
+            user-select: none;
+            border: 2px solid #ffffff;
+            touch-action: none;
+        }
+
+        /* 卡片悬停/激活状态 */
+        .item-card:hover, .item-card.active-state {
+            transform: translateY(-4px) scale(1.08);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            background: linear-gradient(90deg, #f2cc8f 0%, #e07a5f 100%);
+        }
+
+        /* 卡片选中状态 */
+        .item-card.selected {
+            background: linear-gradient(90deg, #e07a5f 0%, #4a7c59 100%);
+            border: 2px solid #f2cc8f;
+            transform: scale(1.05);
+        }
+
+        /* 左右卡片统一样式 */
+        .left-card, .right-card {
+            gap: 8px;
+            font-size: clamp(14px, 2.5vw, 16px);
+            letter-spacing: normal;
+            text-transform: none;
+        }
+
+        /* 卡片头像伪元素 */
+        .left-card::before, .right-card::before {
+            content: '';
+            display: block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 角色头像映射 */
+        .left-card[data-id="1"]::before { background-image: url('https://picsum.photos/id/1025/40/40'); }
+        .left-card[data-id="2"]::before { background-image: url('https://picsum.photos/id/1074/40/40'); }
+        .left-card[data-id="3"]::before { background-image: url('https://picsum.photos/id/1062/40/40'); }
+        .left-card[data-id="4"]::before { background-image: url('https://picsum.photos/id/1005/40/40'); }
+        
+        /* MBTI图标映射 */
+        .right-card[data-answer="a"]::before { background-image: url('ENFJ.JPG'); }
+        .right-card[data-answer="b"]::before { background-image: url('ENTP.JPG'); }
+        .right-card[data-answer="c"]::before { background-image: url('ISTP.JPG'); }
+        .right-card[data-answer="d"]::before { background-image: url('INFJ.JPG'); }
+
+        /* 中间连线区域 */
+        .connect-area {
+            flex: 1;
+            position: relative;
+            cursor: crosshair;
+            max-width: 450px;
+            min-width: 120px;
+        }
+
+        /* SVG容器 */
+        .svg-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 连线基础样式 */
+        .line-path, .temp-line-path {
+            fill: none;
+            stroke-width: 4px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* 正式连线 */
+        .line-path {
+            stroke: #4a7c59;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 1.2s ease-out forwards;
+        }
+
+        /* 临时预览线 */
+        .temp-line-path {
+            stroke: #81b29a;
+            opacity: 0.8;
+        }
+
+        /* 连线绘制动画 */
+        @keyframes dash {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* 提交按钮 */
+        .submit-btn {
+            margin-top: 20px;
+            padding: 12px 35px;
+            font-size: clamp(16px, 3vw, 18px);
+            font-weight: bold;
+            background: linear-gradient(90deg, #e07a5f 0%, #4a7c59 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 80%;
+            max-width: 320px;
+            box-shadow: 0 4px 12px rgba(74, 124, 89, 0.4);
+            letter-spacing: 1px;
+            z-index: 10;
+            position: relative;
+            touch-action: none;
+        }
+
+        .submit-btn:hover, .submit-btn.active-state {
+            transform: scale(1.06);
+            box-shadow: 0 6px 16px rgba(74, 124, 89, 0.6);
+            background: linear-gradient(90deg, #f2cc8f 0%, #e07a5f 100%);
+        }
+
+        .submit-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ========== 烟花特效容器（新增） ========== */
+        .fireworks-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* 不拦截用户交互 */
+            z-index: 1800; /* 介于小黄人和小丑之间 */
+            overflow: hidden; /* 防止粒子溢出屏幕 */
+            display: none; /* 初始隐藏 */
+        }
+
+        /* 烟花粒子基础样式 */
+        .firework-particle {
+            position: absolute;
+            border-radius: 50%; /* 圆形粒子 */
+            pointer-events: none;
+            opacity: 0; /* 初始透明 */
+            /* CSS变量定义，用于动态控制粒子属性 */
+            --particle-size: 6px; /* 粒子大小 */
+            --particle-color: #fff; /* 粒子颜色 */
+            --duration: 2s; /* 动画持续时间 */
+            --delay: 0s; /* 动画延迟时间 */
+        }
+
+        /* 烟花冲击波样式 */
+        .shockwave {
+            position: absolute;
+            border-radius: 50%; /* 圆形冲击波 */
+            pointer-events: none;
+            opacity: 0; /* 初始透明 */
+            border: 2px solid rgba(255, 255, 255, 0.8); /* 白色边框带透明度 */
+            transform: scale(0); /* 初始缩放为0 */
+        }
+
+        /* 烟花爆炸中心点 */
+        .explosion-center {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%); /* 中心定位 */
+            background: radial-gradient(circle, #FFD700 0%, #FF4500 70%, transparent 100%);
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.8);
+            z-index: 1801;
+        }
+
+        /* ========== 小黄人特效容器 ========== */
+        .minions-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* 不拦截用户交互 */
+            z-index: 2000; /* 最高层级 */
+            overflow: hidden; /* 防止元素溢出屏幕 */
+            display: none; /* 初始隐藏 */
+        }
+
+        /* ========== 小黄人样式 ========== */
+        .minion {
+            position: absolute;
+            width: 120px; /* 小黄人宽度 */
+            height: 180px; /* 小黄人高度 */
+            bottom: -200px; /* 初始位置在屏幕下方 */
+            animation-duration: 3s; /* 动画总时长 */
+            animation-timing-function: ease-out; /* 缓出效果 */
+            animation-fill-mode: forwards; /* 保持结束状态 */
+            z-index: 2001; /* 在小黄人容器内最高 */
+        }
+
+        /* 小黄人身体 */
+        .minion-body {
+            position: absolute;
+            width: 100%;
+            height: 140px; /* 身体高度 */
+            bottom: 0;
+            background-color: #FFD800; /* 小黄人标志性黄色 */
+            border-radius: 60px 60px 40px 40px; /* 圆润的身体形状 */
+            overflow: hidden;
+            box-shadow: 
+                0 5px 15px rgba(0, 0, 0, 0.3), /* 外部阴影 */
+                inset 0 -10px 20px rgba(139, 69, 19, 0.2); /* 内部阴影增加立体感 */
+        }
+
+        /* 小黄人背带裤 */
+        .minion-overalls {
+            position: absolute;
+            width: 100%;
+            height: 60px; /* 背带裤高度 */
+            bottom: 0;
+            background-color: #2A52BE; /* 蓝色背带裤 */
+            border-radius: 0 0 40px 40px; /* 底部圆角 */
+            border-top: 8px solid #1E3A8A; /* 背带裤上边装饰 */
+        }
+
+        /* 背带 */
+        .minion-strap {
+            position: absolute;
+            width: 12px; /* 背带宽度 */
+            height: 40px; /* 背带长度 */
+            top: -48px; /* 从身体顶部开始 */
+            background-color: #2A52BE; /* 蓝色与背带裤一致 */
+        }
+
+        /* 左背带 */
+        .minion-strap.left {
+            left: 25%;
+            transform: translateX(-50%) rotate(5deg); /* 轻微旋转 */
+        }
+
+        /* 右背带 */
+        .minion-strap.right {
+            right: 25%;
+            transform: translateX(50%) rotate(-5deg); /* 轻微旋转 */
+        }
+
+        /* 小黄人头部 */
+        .minion-head {
+            position: absolute;
+            width: 130px; /* 头部比身体略宽 */
+            height: 100px; /* 头部高度 */
+            top: -80px; /* 位于身体上方 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #FFD800; /* 黄色与身体一致 */
+            border-radius: 50%; /* 圆形头部 */
+            z-index: 2; /* 在身体上方 */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); /* 头部阴影 */
+        }
+
+        /* 小黄人护目镜 */
+        .minion-goggles {
+            position: absolute;
+            width: 100px; /* 护目镜宽度 */
+            height: 70px; /* 护目镜高度 */
+            top: 15px; /* 头部内位置 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #6A5ACD; /* 护目镜深蓝色 */
+            border-radius: 35px; /* 椭圆形 */
+            overflow: hidden;
+            border: 5px solid #4B0082; /* 护目镜边框 */
+            box-shadow: 
+                inset 0 0 20px rgba(0, 0, 0, 0.5), /* 内部阴影 */
+                0 3px 10px rgba(0, 0, 0, 0.3); /* 外部阴影 */
+        }
+
+        /* 护目镜内部 */
+        .goggles-inner {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: #87CEEB; /* 浅蓝色镜片 */
+            border-radius: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 小黄人眼睛 */
+        .minion-eye {
+            position: absolute;
+            width: 25px; /* 眼睛大小 */
+            height: 25px;
+            background-color: #000000; /* 黑色眼睛 */
+            border-radius: 50%;
+            top: 50%;
+            transform: translateY(-50%);
+            animation: eye-blink 2s infinite; /* 眨眼动画 */
+        }
+
+        /* 左眼 */
+        .minion-eye.left {
+            left: 25px;
+        }
+
+        /* 右眼 */
+        .minion-eye.right {
+            right: 25px;
+        }
+
+        /* 小黄人嘴巴 */
+        .minion-mouth {
+            position: absolute;
+            width: 40px; /* 嘴巴宽度 */
+            height: 20px; /* 嘴巴高度 */
+            bottom: 25px; /* 头部内位置 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #8B4513; /* 棕色嘴巴 */
+            border-radius: 0 0 20px 20px; /* 微笑形状 */
+            overflow: hidden;
+        }
+
+        /* 嘴巴内部（舌头） */
+        .mouth-inner {
+            position: absolute;
+            width: 100%;
+            height: 10px;
+            background-color: #FF6B6B; /* 红色舌头 */
+            border-radius: 0 0 10px 10px;
+            top: 0;
+        }
+
+        /* 小黄人手部 */
+        .minion-hand {
+            position: absolute;
+            width: 25px; /* 手部宽度 */
+            height: 60px; /* 手部长度 */
+            background-color: #FFD800; /* 黄色与身体一致 */
+            bottom: 80px; /* 位于背带裤上方 */
+            border-radius: 12px; /* 圆润的手部 */
+            z-index: 1; /* 在身体下方 */
+        }
+
+        /* 左手 */
+        .minion-hand.left {
+            left: -15px;
+            transform: rotate(30deg); /* 左手角度 */
+        }
+
+        /* 右手 */
+        .minion-hand.right {
+            right: -15px;
+            transform: rotate(-30deg); /* 右手角度 */
+        }
+
+        /* 小黄人腿部 */
+        .minion-leg {
+            position: absolute;
+            width: 25px; /* 腿部宽度 */
+            height: 40px; /* 腿部长度 */
+            background-color: #2A52BE; /* 蓝色与背带裤一致 */
+            bottom: 0;
+            border-radius: 10px 10px 0 0; /* 顶部圆角 */
+        }
+
+        /* 左腿 */
+        .minion-leg.left {
+            left: 35%;
+            transform: translateX(-50%);
+        }
+
+        /* 右腿 */
+        .minion-leg.right {
+            right: 35%;
+            transform: translateX(50%);
+        }
+
+        /* ========== 小丑特效容器（失败特效） ========== */
+        .clown-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* 不拦截用户交互 */
+            z-index: 1500; /* 比烟花层级更高 */
+            overflow: hidden; /* 防止元素溢出屏幕 */
+            display: none; /* 初始隐藏 */
+        }
+
+        /* ========== 成功文字提示（小黄人专用） ========== */
+        .success-message-minions {
+            position: fixed;
+            top: 15%; /* 屏幕顶部位置 */
+            left: 50%;
+            transform: translateX(-50%) scale(0); /* 初始缩放为0，水平居中 */
+            font-size: clamp(32px, 7vw, 56px); /* 响应式字体大小 */
+            font-weight: 900; /* 超粗体 */
+            text-align: center; /* 居中文本 */
+            color: #FFD800; /* 小黄人主题黄色 */
+            pointer-events: none; /* 不拦截用户交互 */
+            z-index: 2002; /* 高于小黄人 */
+            text-shadow: 
+                3px 3px 0 #2A52BE, /* 蓝色阴影 */
+                6px 6px 0 rgba(0, 0, 0, 0.3); /* 深色阴影增加立体感 */
+            letter-spacing: 3px; /* 字间距 */
+            padding: 20px 40px; /* 内边距 */
+            border-radius: 20px; /* 圆角 */
+            display: none; /* 初始隐藏 */
+            white-space: nowrap; /* 不换行 */
+            background: rgba(255, 255, 255, 0.95); /* 半透明白色背景 */
+            box-shadow: 
+                0 10px 30px rgba(255, 216, 0, 0.5), /* 黄色光晕 */
+                inset 0 0 20px rgba(42, 82, 190, 0.2); /* 蓝色内发光 */
+            animation: minions-text-bounce 1s 1.5s infinite alternate; /* 弹跳动画 */
+        }
+
+        /* ========== 动画定义 ========== */
+
+        /* 烟花爆炸动画 */
+        @keyframes firework-explode {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            10% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx), var(--ty)) scale(0.2);
+                --tx: calc(var(--x-velocity) * 1.5);
+                --ty: calc(var(--y-velocity) * 1.5);
+            }
+        }
+
+        /* 烟花冲击波动画 */
+        @keyframes shockwave-expand {
+            0% {
+                opacity: 1;
+                transform: scale(0);
+            }
+            90% {
+                opacity: 0.1;
+            }
+            100% {
+                opacity: 0;
+                transform: scale(3);
+            }
+        }
+
+        /* 爆炸中心点动画 */
+        @keyframes center-explode {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(0);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(2);
+            }
+        }
+
+        /* 小黄人跳跃动画 */
+        @keyframes minion-jump {
+            0% {
+                transform: translateX(var(--start-x)) translateY(0) rotate(0deg);
+                bottom: -200px; /* 起始位置在屏幕下方 */
+            }
+            20% {
+                transform: translateX(var(--start-x)) translateY(-20px) rotate(-5deg);
+                bottom: 50vh; /* 快速上升 */
+            }
+            40% {
+                transform: translateX(var(--mid-x)) translateY(-150px) rotate(10deg);
+                bottom: 60vh; /* 到达跳跃顶点 */
+            }
+            60% {
+                transform: translateX(var(--mid-x)) translateY(-100px) rotate(-8deg);
+                bottom: 40vh; /* 开始下落 */
+            }
+            80% {
+                transform: translateX(var(--end-x)) translateY(-50px) rotate(5deg);
+                bottom: 30vh; /* 继续下落 */
+            }
+            100% {
+                transform: translateX(var(--end-x)) translateY(0) rotate(0deg);
+                bottom: 20vh; /* 最终位置 */
+            }
+        }
+
+        /* 小黄人挥手动画 */
+        @keyframes minion-wave {
+            0%, 100% {
+                transform: rotate(30deg); /* 左手初始角度 */
+            }
+            50% {
+                transform: rotate(60deg); /* 挥手动作 */
+            }
+        }
+
+        /* 小黄人挥手动画（右手） */
+        @keyframes minion-wave-right {
+            0%, 100% {
+                transform: rotate(-30deg); /* 右手初始角度 */
+            }
+            50% {
+                transform: rotate(-60deg); /* 挥手动作 */
+            }
+        }
+
+        /* 小黄人眨眼动画 */
+        @keyframes eye-blink {
+            0%, 90%, 100% {
+                height: 25px; /* 眼睛正常大小 */
+            }
+            92%, 98% {
+                height: 2px; /* 眨眼时眼睛变细 */
+            }
+        }
+
+        /* 小黄人文字弹跳动画 */
+        @keyframes minions-text-bounce {
+            0%, 100% {
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+            50% {
+                transform: translateX(-50%) translateY(-15px) scale(1.05);
+            }
+        }
+
+        /* 小黄人文字出现动画 */
+        @keyframes minions-text-appear {
+            0% {
+                transform: translateX(-50%) scale(0) rotate(-10deg);
+                opacity: 0;
+            }
+            70% {
+                transform: translateX(-50%) scale(1.1) rotate(5deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(-50%) scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        /* 小黄人文字消失动画 */
+        @keyframes minions-text-disappear {
+            0% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(-50%) scale(0.8);
+                opacity: 0;
+            }
+        }
+
+        /* ========== 失败特效（保留原有） ========== */
+        /* 小丑样式（保留原有） */
+        .clown-face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0); /* 初始缩放为0 */
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(45deg, #ff3366, #ff9966);
+            border-radius: 50%;
+            animation: clown-appear 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards,
+                       clown-shake 1.5s 0.8s infinite alternate;
+            box-shadow: 
+                0 0 50px rgba(255, 51, 102, 0.6),
+                0 0 100px rgba(255, 153, 102, 0.4),
+                inset 0 0 30px rgba(255, 255, 255, 0.3);
+            z-index: 1501;
+        }
+
+        .clown-eye {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            top: 60px;
+            overflow: hidden;
+        }
+
+        .clown-eye.left {
+            left: 45px;
+        }
+
+        .clown-eye.right {
+            right: 45px;
+        }
+
+        .clown-pupil {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background: #333;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: eye-roll 2s 1s infinite alternate;
+        }
+
+        .clown-nose {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background: #ff3366;
+            border-radius: 50%;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: nose-bounce 0.8s 0.5s infinite alternate;
+            box-shadow: 
+                0 5px 15px rgba(0, 0, 0, 0.2),
+                inset 0 -5px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .clown-mouth {
+            position: absolute;
+            width: 100px;
+            height: 50px;
+            background: #ff3366;
+            border-radius: 0 0 50px 50px;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            overflow: hidden;
+            animation: mouth-open 1.2s 0.3s infinite alternate;
+        }
+
+        .mouth-inner-clown {
+            position: absolute;
+            width: 100%;
+            height: 30px;
+            background: #ff6699;
+            border-radius: 0 0 30px 30px;
+            top: 0;
+            left: 0;
+        }
+
+        .clown-hat {
+            position: absolute;
+            width: 140px;
+            height: 60px;
+            background: #3366ff;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 50% 50% 0 0;
+            box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.2);
+            animation: hat-tilt 1.2s 0.7s infinite alternate;
+        }
+
+        .hat-pompom {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #ffcc00;
+            border-radius: 50%;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: pompom-bounce 0.6s 0.9s infinite alternate;
+        }
+
+        /* 失败文字提示 */
+        .fail-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0); /* 初始缩放为0，居中 */
+            font-size: clamp(28px, 6vw, 48px);
+            font-weight: 900;
+            text-align: center;
+            color: #ff3366;
+            pointer-events: none;
+            z-index: 1600; /* 高于小丑 */
+            text-shadow: 
+                3px 3px 0 #ffcc00,
+                6px 6px 0 rgba(0, 0, 0, 0.2);
+            letter-spacing: 2px;
+            padding: 15px 30px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 
+                0 10px 30px rgba(255, 51, 102, 0.4),
+                inset 0 0 20px rgba(255, 204, 0, 0.3);
+            display: none;
+            white-space: nowrap;
+            animation: fail-text-pulse 1.2s 0.6s infinite alternate;
+        }
+
+        .fail-decoration {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ffcc00;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 1502;
+        }
+
+        /* ========== 失败动画（保留原有） ========== */
+        @keyframes clown-appear {
+            0% {
+                transform: translate(-50%, -50%) scale(0) rotate(0deg);
+                opacity: 0;
+            }
+            70% {
+                transform: translate(-50%, -50%) scale(1.1) rotate(10deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes clown-shake {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1) rotate(0deg);
+            }
+            25% {
+                transform: translate(-50%, -50%) scale(1.05) rotate(-5deg);
+            }
+            75% {
+                transform: translate(-50%, -50%) scale(1.05) rotate(5deg);
+            }
+        }
+
+        @keyframes eye-roll {
+            0%, 100% {
+                transform: translate(-50%, -50%);
+            }
+            33% {
+                transform: translate(-70%, -50%);
+            }
+            66% {
+                transform: translate(-30%, -50%);
+            }
+        }
+
+        @keyframes nose-bounce {
+            0%, 100% {
+                transform: translateX(-50%) scale(1);
+            }
+            50% {
+                transform: translateX(-50%) scale(1.2);
+            }
+        }
+
+        @keyframes mouth-open {
+            0%, 100% {
+                height: 50px;
+                border-radius: 0 0 50px 50px;
+            }
+            50% {
+                height: 70px;
+                border-radius: 0 0 70px 70px;
+            }
+        }
+
+        @keyframes hat-tilt {
+            0%, 100% {
+                transform: translateX(-50%) rotate(0deg);
+            }
+            50% {
+                transform: translateX(-50%) rotate(15deg);
+            }
+        }
+
+        @keyframes pompom-bounce {
+            0%, 100% {
+                transform: translateX(-50%) translateY(0);
+            }
+            50% {
+                transform: translateX(-50%) translateY(-10px);
+            }
+        }
+
+        @keyframes fail-text-pulse {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                color: #ff3366;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+                color: #ff6699;
+            }
+        }
+
+        @keyframes fail-text-appear {
+            0% {
+                transform: translate(-50%, -50%) scale(0) rotate(-10deg);
+                opacity: 0;
+            }
+            70% {
+                transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes decoration-fly-in {
+            0% {
+                opacity: 0;
+                transform: translate(var(--start-x), var(--start-y)) scale(0) rotate(0deg);
+            }
+            70% {
+                opacity: 1;
+                transform: translate(var(--mid-x), var(--mid-y)) scale(1.2) rotate(180deg);
+            }
+            100% {
+                opacity: 0.8;
+                transform: translate(var(--end-x), var(--end-y)) scale(1) rotate(360deg);
+            }
+        }
+
+        @keyframes screen-red-flash {
+            0%, 100% {
+                background-color: transparent;
+            }
+            20% {
+                background-color: rgba(255, 51, 102, 0.3);
+            }
+            40% {
+                background-color: rgba(255, 153, 102, 0.2);
+            }
+            60% {
+                background-color: rgba(255, 51, 102, 0.1);
+            }
+        }
+
+        /* ========== 响应式适配 ========== */
+        
+        /* 平板/大屏手机适配 */
+        @media (max-width: 768px) {
+            .game-container {
+                height: 65vh;
+            }
+            .left-items, .right-items {
+                width: clamp(80px, 16vw, 120px);
+                gap: 10px;
+            }
+            .connect-area {
+                max-width: none;
+                min-width: 100px;
+            }
+            .item-card {
+                min-height: 70px;
+                padding: 8px 6px;
+            }
+            .left-card::before, .right-card::before {
+                width: 35px;
+                height: 35px;
+            }
+            
+            /* 小黄人响应式 */
+            .minion {
+                width: 90px;
+                height: 135px;
+            }
+            .minion-body {
+                height: 105px;
+                border-radius: 45px 45px 30px 30px;
+            }
+            .minion-head {
+                width: 100px;
+                height: 75px;
+                top: -60px;
+            }
+            .minion-goggles {
+                width: 75px;
+                height: 52px;
+                top: 10px;
+            }
+            .minion-eye {
+                width: 18px;
+                height: 18px;
+            }
+            .minion-eye.left {
+                left: 18px;
+            }
+            .minion-eye.right {
+                right: 18px;
+            }
+            .success-message-minions {
+                font-size: clamp(24px, 5vw, 40px);
+                padding: 15px 30px;
+                white-space: normal;
+                line-height: 1.3;
+            }
+            
+            /* 烟花响应式 */
+            .firework-particle {
+                --particle-size: 4px;
+            }
+            
+            /* 小丑响应式 */
+            .clown-face {
+                width: 150px;
+                height: 150px;
+            }
+            .clown-eye {
+                width: 30px;
+                height: 30px;
+                top: 45px;
+            }
+            .clown-eye.left {
+                left: 35px;
+            }
+            .clown-eye.right {
+                right: 35px;
+            }
+            .clown-nose {
+                top: 75px;
+                width: 25px;
+                height: 35px;
+            }
+            .clown-mouth {
+                width: 80px;
+                bottom: 40px;
+            }
+            .clown-hat {
+                width: 110px;
+                height: 50px;
+                top: -35px;
+            }
+            .fail-message {
+                font-size: clamp(24px, 5vw, 36px);
+                padding: 12px 24px;
+                white-space: normal;
+                line-height: 1.3;
+            }
+        }
+
+        /* 小屏手机适配 */
+        @media (max-width: 375px) {
+            .game-title {
+                font-size: 24px;
+                padding: 8px 15px;
+            }
+            .game-container {
+                height: 60vh;
+            }
+            .items-wrapper {
+                gap: 8px;
+                padding: 10px 5px;
+            }
+            .left-items, .right-items {
+                gap: 8px;
+            }
+            .item-card {
+                min-height: 65px;
+                font-size: clamp(12px, 2vw, 14px);
+            }
+            .left-card::before, .right-card::before {
+                width: 40px;
+                height: 40px;
+            }
+            
+            /* 小黄人响应式 */
+            .minion {
+                width: 70px;
+                height: 105px;
+            }
+            .minion-body {
+                height: 80px;
+                border-radius: 35px 35px 25px 25px;
+            }
+            .minion-head {
+                width: 80px;
+                height: 60px;
+                top: -50px;
+            }
+            .minion-goggles {
+                width: 60px;
+                height: 40px;
+                top: 8px;
+            }
+            .minion-eye {
+                width: 15px;
+                height: 15px;
+            }
+            .minion-eye.left {
+                left: 15px;
+            }
+            .minion-eye.right {
+                right: 15px;
+            }
+            .success-message-minions {
+                font-size: clamp(20px, 4vw, 32px);
+                padding: 10px 20px;
+                white-space: normal;
+            }
+            
+            /* 烟花响应式 */
+            .firework-particle {
+                --particle-size: 3px;
+            }
+            
+            /* 小丑响应式 */
+            .clown-face {
+                width: 120px;
+                height: 120px;
+            }
+            .clown-eye {
+                width: 25px;
+                height: 25px;
+                top: 35px;
+            }
+            .clown-eye.left {
+                left: 25px;
+            }
+            .clown-eye.right {
+                right: 25px;
+            }
+            .clown-nose {
+                top: 60px;
+                width: 20px;
+                height: 30px;
+            }
+            .clown-mouth {
+                width: 60px;
+                height: 40px;
+                bottom: 30px;
+            }
+            .clown-hat {
+                width: 90px;
+                height: 40px;
+                top: -30px;
+            }
+            .fail-message {
+                font-size: clamp(20px, 4vw, 28px);
+                padding: 10px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 游戏标题 -->
+    <h2 class="game-title">MBTI 角色连线</h2>
+    
+    <!-- 游戏主容器 -->
+    <div class="game-container">
+        <div class="items-wrapper">
+            <!-- 左侧角色卡片 -->
+            <div class="left-items">
+                <div class="item-card left-card" data-id="1">人员A</div>
+                <div class="item-card left-card" data-id="2">人员B</div>
+                <div class="item-card left-card" data-id="3">人员C</div>
+                <div class="item-card left-card" data-id="4">人员D</div>
+            </div>
+            
+            <!-- 中间连线区域 -->
+            <div class="connect-area" id="connectArea">
+                <svg class="svg-container" id="svgContainer"></svg>
+            </div>
+            
+            <!-- 右侧MBTI卡片 -->
+            <div class="right-items">
+                <div class="item-card right-card" data-answer="a">ENFJ</div>
+                <div class="item-card right-card" data-answer="b">ENTP</div>
+                <div class="item-card right-card" data-answer="c">ISTP</div>
+                <div class="item-card right-card" data-answer="d">INFJ</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提交按钮 -->
+    <button class="submit-btn" id="submitBtn" disabled>提交答案</button>
+    
+    <!-- 烟花特效容器（新增） -->
+    <div class="fireworks-container" id="fireworksContainer"></div>
+    
+    <!-- 小黄人特效容器 -->
+    <div class="minions-container" id="minionsContainer"></div>
+    
+    <!-- 小丑特效容器（失败特效） -->
+    <div class="clown-container" id="clownContainer"></div>
+    
+    <!-- 失败文字提示 -->
+    <div class="fail-message" id="failMessage">😭 答错了！再来一次！</div>
+    
+    <!-- 成功文字提示（小黄人专用） -->
+    <div class="success-message-minions" id="successMessageMinions">🎉 太棒了！全部正确！ 🎉</div>
+    
+    <!-- 音效（预加载） -->
+    <audio id="successSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" type="audio/mpeg">
+    </audio>
+    
+    <audio id="failSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-cartoon-falling-whistle-392.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- 小黄人庆祝音效 -->
+    <audio id="minionsSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-funny-cartoon-jump-257.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- 烟花音效（新增） -->
+    <audio id="fireworksSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-fireworks-explosion-1652.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // ========== 全局常量/变量定义 ==========
+        
+        /**
+         * 正确答案映射表
+         * 格式：角色ID -> MBTI答案ID
+         * 1: 人员A -> ENTP (b)
+         * 2: 人员B -> INFJ (d)
+         * 3: 人员C -> ENFJ (a)
+         * 4: 人员D -> ISTP (c)
+         */
+        const correctAnswers = {
+            1: 'b',
+            2: 'd',
+            3: 'a',
+            4: 'c'
+        };
+
+        const userAnswers = {}; // 存储用户答案：{角色ID: MBTI类型}
+        let isDragging = false; // 拖拽状态标记：true=正在拖拽
+        let startItem = null;   // 拖拽起始卡片（左侧角色卡片）
+        let tempLinePath = null;// 临时预览连线（SVG路径元素）
+
+        // DOM元素引用
+        const fireworksContainer = document.getElementById('fireworksContainer'); // 烟花容器（新增）
+        const minionsContainer = document.getElementById('minionsContainer'); // 小黄人容器
+        const clownContainer = document.getElementById('clownContainer'); // 小丑容器
+        const failMessage = document.getElementById('failMessage'); // 失败文字提示
+        const successMessageMinions = document.getElementById('successMessageMinions'); // 成功文字提示（小黄人专用）
+        const successSound = document.getElementById('successSound'); // 成功音效
+        const failSound = document.getElementById('failSound'); // 失败音效
+        const minionsSound = document.getElementById('minionsSound'); // 小黄人音效
+        const fireworksSound = document.getElementById('fireworksSound'); // 烟花音效（新增）
+        const connectArea = document.getElementById('connectArea'); // 连线区域
+        const svgContainer = document.getElementById('svgContainer'); // SVG容器
+        const submitBtn = document.getElementById('submitBtn'); // 提交按钮
+        const allCards = document.querySelectorAll('.item-card'); // 所有卡片
+
+        // ========== 初始化函数 ==========
+        
+        /**
+         * 页面加载完成后初始化游戏
+         * 功能：设置SVG尺寸、绑定事件监听器
+         */
+        function init() {
+            resizeSVG(); // 初始化SVG尺寸
+            window.addEventListener('resize', resizeSVG); // 窗口大小变化时重新调整SVG
+            submitBtn.addEventListener('click', handleSubmit); // 提交按钮点击事件
+            bindTouchEvents(); // 绑定移动端触摸事件
+            bindDragEvents();   // 绑定拖拽事件
+        }
+
+        // ========== 移动端触摸交互事件绑定 ==========
+        
+        /**
+         * 绑定移动端触摸事件，模拟PC端的hover效果
+         * 使用active-state类替代:hover伪类
+         */
+        function bindTouchEvents() {
+            // 为所有卡片绑定触摸事件
+            allCards.forEach(card => {
+                // 触摸开始：添加active-state类，显示悬停效果
+                card.addEventListener('touchstart', (e) => {
+                    if (!isDragging) { // 拖拽过程中不触发
+                        card.classList.add('active-state');
+                    }
+                }, { passive: true }); // passive: true提升触摸滚动性能
+
+                // 移除active-state类的通用函数（延迟100ms模拟回弹）
+                const removeActiveState = (e) => {
+                    setTimeout(() => {
+                        // 已选中或拖拽中的卡片不移除active-state
+                        if (!card.classList.contains('selected') && !isDragging) {
+                            card.classList.remove('active-state');
+                        }
+                    }, 100);
+                };
+
+                // 触摸结束：移除active-state
+                card.addEventListener('touchend', removeActiveState);
+                // 触摸取消（如来电、离开屏幕）：移除active-state
+                card.addEventListener('touchcancel', removeActiveState);
+                // 触摸移动：手指移出卡片范围时立即移除效果
+                card.addEventListener('touchmove', (e) => {
+                    const rect = card.getBoundingClientRect(); // 获取卡片边界
+                    const touch = e.touches[0]; // 获取第一个触摸点
+                    // 判断触摸点是否在卡片范围内
+                    if (touch.clientX < rect.left || touch.clientX > rect.right || 
+                        touch.clientY < rect.top || touch.clientY > rect.bottom) {
+                        removeActiveState(); // 移出范围则移除效果
+                    }
+                });
+            });
+
+            // 提交按钮触摸事件
+            submitBtn.addEventListener('touchstart', (e) => {
+                if (!submitBtn.disabled) { // 未禁用时才添加效果
+                    submitBtn.classList.add('active-state');
+                }
+            }, { passive: true });
+
+            // 触摸结束：延迟100ms移除按钮效果
+            submitBtn.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    submitBtn.classList.remove('active-state');
+                }, 100);
+            });
+
+            // 触摸取消：立即移除按钮效果
+            submitBtn.addEventListener('touchcancel', () => {
+                submitBtn.classList.remove('active-state');
+            });
+        }
+
+        // ========== 拖拽事件绑定（PC/移动端兼容） ==========
+        
+        /**
+         * 绑定拖拽相关事件，同时支持鼠标和触摸
+         */
+        function bindDragEvents() {
+            // 开始拖拽事件
+            allCards.forEach(card => {
+                card.addEventListener('mousedown', startDrag); // PC端：鼠标按下
+                // 移动端：触摸开始，阻止默认行为（避免页面滚动）
+                card.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // 阻止默认滚动行为
+                    startDrag(e);
+                }, { passive: false });
+            });
+
+            // 拖拽移动事件
+            document.addEventListener('mousemove', dragMove); // PC端：鼠标移动
+            // 移动端：触摸移动，阻止默认行为
+            document.addEventListener('touchmove', (e) => {
+                e.preventDefault(); // 阻止默认滚动行为
+                dragMove(e);
+            }, { passive: false });
+
+            // 结束拖拽事件
+            document.addEventListener('mouseup', endDrag);       // PC端：鼠标松开
+            document.addEventListener('touchend', endDrag);      // 移动端：触摸结束
+            document.addEventListener('touchcancel', endDrag);   // 移动端：触摸取消
+        }
+
+        /**
+         * 开始拖拽处理函数
+         * @param {Event} e - 鼠标或触摸事件
+         */
+        function startDrag(e) {
+            // 获取触发事件的卡片元素
+            const target = e.target || (e.touches && e.touches[0].target);
+            startItem = target.closest('.item-card');
+
+            // 仅允许拖拽左侧角色卡片
+            if (!startItem || !startItem.closest('.left-items')) return;
+
+            // 设置拖拽状态
+            isDragging = true;
+            startItem.classList.add('dragging', 'selected'); // 添加拖拽和选中样式
+            startItem.classList.remove('active-state');      // 移除触摸效果，避免冲突
+
+            // 创建临时预览连线
+            tempLinePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempLinePath.setAttribute('class', 'temp-line-path');
+            svgContainer.appendChild(tempLinePath);
+
+            // 更新临时连线初始位置
+            updateTempLine(e);
+        }
+
+        /**
+         * 拖拽移动处理函数
+         * @param {Event} e - 鼠标或触摸事件
+         */
+        function dragMove(e) {
+            // 非拖拽状态或无起始卡片时直接返回
+            if (!isDragging || !startItem || !tempLinePath) return;
+            updateTempLine(e); // 更新临时连线位置
+        }
+
+        /**
+         * 更新临时连线坐标
+         * @param {Event} e - 鼠标或触摸事件
+         */
+        function updateTempLine(e) {
+            // 兼容触摸事件：获取触摸点坐标
+            const touch = e.touches && e.touches[0];
+            const clientX = touch ? touch.clientX : e.clientX;
+            const clientY = touch ? touch.clientY : e.clientY;
+
+            // 获取卡片和连线区域的边界信息
+            const startRect = startItem.getBoundingClientRect();
+            const areaRect = connectArea.getBoundingClientRect();
+
+            // 计算卡片在SVG中的相对坐标（卡片右侧中点）
+            const startX = startRect.right - areaRect.left;
+            const startY = startRect.top + startRect.height/2 - areaRect.top;
+
+            // 计算触摸点在SVG中的相对坐标
+            const endX = clientX - areaRect.left;
+            const endY = clientY - areaRect.top;
+
+            // 根据屏幕宽度调整曲线弧度
+            const screenWidth = window.innerWidth;
+            const curveOffset = screenWidth < 480 ? 25 : 35; // 小屏弧度小，大屏弧度大
+            
+            // 贝塞尔曲线控制点
+            const controlX = (startX + endX) / 2;
+            const controlY = (startY + endY) / 2 - curveOffset; // 控制点上移，形成弧形
+
+            // 生成贝塞尔曲线路径数据
+            const pathData = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
+            tempLinePath.setAttribute('d', pathData); // 设置SVG路径
+        }
+
+        /**
+         * 结束拖拽处理函数
+         * @param {Event} e - 鼠标或触摸事件
+         */
+        function endDrag(e) {
+            // 非拖拽状态或无起始卡片时直接返回
+            if (!isDragging || !startItem || !tempLinePath) return;
+
+            // 移除临时连线
+            tempLinePath.remove();
+            tempLinePath = null;
+            startItem.classList.remove('dragging'); // 移除拖拽样式
+
+            // 获取结束位置的坐标
+            const changedTouch = e.changedTouches && e.changedTouches[0];
+            const clientX = changedTouch ? changedTouch.clientX : e.clientX;
+            const clientY = changedTouch ? changedTouch.clientY : e.clientY;
+
+            // 找到结束位置的元素
+            const endElement = document.elementFromPoint(clientX, clientY);
+            const endItem = endElement ? endElement.closest('.item-card') : null;
+
+            // 判断是否拖拽到右侧MBTI卡片
+            if (endItem && endItem.closest('.right-items')) {
+                const questionId = startItem.dataset.id;    // 获取角色ID
+                const answerId = endItem.dataset.answer;    // 获取MBTI答案ID
+
+                // 移除该MBTI类型之前的连线（避免重复连线）
+                Object.keys(userAnswers).forEach(qId => {
+                    if (userAnswers[qId] === answerId) {
+                        const oldStart = document.querySelector(`.left-card[data-id="${qId}"]`);
+                        oldStart?.classList.remove('selected'); // 移除旧卡片的选中状态
+                        delete userAnswers[qId]; // 删除旧答案
+                    }
+                });
+
+                // 存储用户答案
+                userAnswers[questionId] = answerId;
+                // 创建正式连线
+                createCurvedLine(startItem, endItem, questionId);
+                // 标记卡片为选中状态
+                startItem.classList.add('selected');
+                endItem.classList.add('selected');
+            } else {
+                // 未拖拽到有效区域，移除选中状态
+                startItem.classList.remove('selected');
+            }
+
+            // 重置拖拽状态
+            isDragging = false;
+            startItem = null;
+
+            // 检查是否所有题目都已作答
+            checkAllAnswered();
+        }
+
+        // ========== 连线绘制函数 ==========
+        
+        /**
+         * 创建正式弧形连线
+         * @param {HTMLElement} fromItem - 起始卡片（角色）
+         * @param {HTMLElement} toItem - 结束卡片（MBTI）
+         * @param {string} questionId - 角色ID（用于标记连线）
+         */
+        function createCurvedLine(fromItem, toItem, questionId) {
+            // 移除该题目的旧连线
+            const existingLines = svgContainer.querySelectorAll(`.line-path[data-question="${questionId}"]`);
+            existingLines.forEach(line => line.remove());
+
+            // 获取卡片和连线区域的边界信息
+            const fromRect = fromItem.getBoundingClientRect();
+            const toRect = toItem.getBoundingClientRect();
+            const areaRect = connectArea.getBoundingClientRect();
+
+            // 计算起始卡片坐标（右侧中点）
+            const startX = fromRect.right - areaRect.left;
+            const startY = fromRect.top + fromRect.height/2 - areaRect.top;
+
+            // 计算结束卡片坐标（左侧中点）
+            const endX = toRect.left - areaRect.left;
+            const endY = toRect.top + toRect.height/2 - areaRect.top;
+
+            // 根据屏幕宽度调整曲线弧度
+            const screenWidth = window.innerWidth;
+            const curveOffset = screenWidth < 480 ? 25 : 35;
+            const controlX = (startX + endX) / 2;
+            const controlY = (startY + endY) / 2 - curveOffset;
+
+            // 创建SVG连线元素
+            const linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            linePath.setAttribute('class', 'line-path'); // 正式连线样式
+            linePath.setAttribute('data-question', questionId); // 标记所属题目
+            linePath.setAttribute('d', `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`); // 贝塞尔曲线路径
+            svgContainer.appendChild(linePath); // 添加到SVG容器
+        }
+
+        // ========== 答题状态检查 ==========
+        
+        /**
+         * 检查是否所有角色都已连线
+         * @returns {boolean} 是否全部完成
+         */
+        function checkAllAnswered() {
+            // 遍历所有正确答案的键，检查是否都在用户答案中
+            const allAnswered = Object.keys(correctAnswers).every(id => userAnswers[id]);
+            submitBtn.disabled = !allAnswered; // 全部完成则启用提交按钮
+        }
+
+        // ========== 烟花特效函数（新增） ==========
+        
+        /**
+         * 创建全屏烟花特效
+         * 与小黄人动画同时播放，增强庆祝效果
+         */
+        function createFireworks() {
+            // 清空之前的烟花效果
+            fireworksContainer.innerHTML = '';
+            // 显示烟花容器
+            fireworksContainer.style.display = 'block';
+            
+            // 获取屏幕尺寸
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // 根据屏幕尺寸确定爆炸中心数量
+            const explosionCount = screenWidth < 768 ? 4 : 6; // 小屏幕4个，大屏幕6个
+            
+            // 创建多个爆炸中心，形成连环爆炸效果
+            for (let i = 0; i < explosionCount; i++) {
+                // 延迟每个爆炸中心的出现时间，形成连续爆炸效果
+                setTimeout(() => {
+                    // 随机生成爆炸中心位置（避开屏幕边缘）
+                    const centerX = Math.random() * (screenWidth * 0.8) + (screenWidth * 0.1);
+                    const centerY = Math.random() * (screenHeight * 0.8) + (screenHeight * 0.1);
+                    
+                    // 创建爆炸中心点
+                    createExplosionCenter(centerX, centerY);
+                    
+                    // 创建粒子爆炸（主效果）
+                    createParticleExplosion(centerX, centerY);
+                    
+                    // 创建冲击波效果
+                    createShockwave(centerX, centerY);
+                    
+                    // 播放烟花音效（每个爆炸点都播放）
+                    playFireworksSound();
+                    
+                }, i * 400); // 连环爆炸：每个爆炸间隔400ms
+            }
+            
+            // 4.5秒后自动隐藏烟花容器（与小黄人动画同步）
+            setTimeout(() => {
+                fireworksContainer.style.display = 'none';
+            }, 4500);
+        }
+        
+        /**
+         * 创建爆炸中心点
+         * @param {number} x - X坐标
+         * @param {number} y - Y坐标
+         */
+        function createExplosionCenter(x, y) {
+            const center = document.createElement('div');
+            center.className = 'explosion-center';
+            center.style.left = `${x}px`;
+            center.style.top = `${y}px`;
+            
+            // 随机大小
+            const size = 30 + Math.random() * 30;
+            center.style.width = `${size}px`;
+            center.style.height = `${size}px`;
+            
+            // 应用爆炸动画
+            center.style.animation = `center-explode 1.2s ease-out forwards`;
+            
+            fireworksContainer.appendChild(center);
+        }
+        
+        /**
+         * 创建粒子爆炸效果
+         * @param {number} centerX - 爆炸中心X坐标
+         * @param {number} centerY - 爆炸中心Y坐标
+         */
+        function createParticleExplosion(centerX, centerY) {
+            // 根据屏幕尺寸确定粒子数量
+            const particleCount = window.innerWidth < 768 ? 80 : 150;
+            
+            // 烟花颜色集合（鲜艳多彩）
+            const colors = [
+                '#FFD700', '#FF4500', '#00FFFF', '#FF1493', '#7CFC00',
+                '#FF00FF', '#00FF00', '#FFA500', '#FFFFFF', '#9370DB',
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'
+            ];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'firework-particle';
+                
+                // 随机粒子大小
+                const size = 2 + Math.random() * 6;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // 随机粒子颜色
+                particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 随机粒子运动方向
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 30 + Math.random() * 200; // 随机爆炸范围
+                
+                const endX = Math.cos(angle) * distance;
+                const endY = Math.sin(angle) * distance;
+                
+                // 设置CSS变量用于动画控制
+                particle.style.setProperty('--x-velocity', `${endX}px`);
+                particle.style.setProperty('--y-velocity', `${endY}px`);
+                
+                // 设置粒子初始位置
+                particle.style.left = `${centerX}px`;
+                particle.style.top = `${centerY}px`;
+                
+                // 随机动画参数
+                const delay = Math.random() * 0.3;
+                const duration = 1.2 + Math.random() * 0.8;
+                
+                // 应用爆炸动画
+                particle.style.animation = `
+                    firework-explode ${duration}s ease-out ${delay}s forwards
+                `;
+                
+                // 随机层级
+                particle.style.zIndex = Math.floor(Math.random() * 10) + 1;
+                
+                fireworksContainer.appendChild(particle);
+            }
+        }
+        
+        /**
+         * 创建冲击波效果
+         * @param {number} x - X坐标
+         * @param {number} y - Y坐标
+         */
+        function createShockwave(x, y) {
+            const shockwave = document.createElement('div');
+            shockwave.className = 'shockwave';
+            shockwave.style.left = `${x}px`;
+            shockwave.style.top = `${y}px`;
+            
+            // 随机冲击波大小
+            const size = 20 + Math.random() * 40;
+            shockwave.style.width = `${size}px`;
+            shockwave.style.height = `${size}px`;
+            
+            // 随机颜色（从颜色集合中选取）
+            const colors = ['#FFD700', '#00FFFF', '#FF1493', '#FFFFFF'];
+            shockwave.style.borderColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            // 应用冲击波动画
+            shockwave.style.animation = `shockwave-expand 1.5s ease-out forwards`;
+            
+            fireworksContainer.appendChild(shockwave);
+        }
+        
+        /**
+         * 播放烟花音效
+         */
+        function playFireworksSound() {
+            try {
+                fireworksSound.currentTime = 0;
+                const playPromise = fireworksSound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('烟花音效播放失败:', error);
+                    });
+                }
+            } catch (error) {
+                console.log('烟花音效播放失败:', error);
+            }
+        }
+
+        // ========== 小黄人特效函数 ==========
+        
+        /**
+         * 创建小黄人成功特效
+         * 包含多个小黄人从屏幕底部跳跃进入，配合文字提示
+         */
+        function createMinionsAnimation() {
+            // 清空小黄人容器
+            minionsContainer.innerHTML = '';
+            // 显示小黄人容器
+            minionsContainer.style.display = 'block';
+            
+            // 根据屏幕尺寸确定小黄人数量
+            const screenWidth = window.innerWidth;
+            const minionCount = screenWidth < 768 ? 3 : 5; // 小屏幕3个，大屏幕5个
+            
+            // 创建多个小黄人
+            for (let i = 0; i < minionCount; i++) {
+                // 计算每个小黄人的位置和动画参数
+                const startX = (screenWidth / (minionCount + 1)) * (i + 1);
+                const midX = startX + (Math.random() - 0.5) * 100; // 中间位置随机偏移
+                const endX = startX + (Math.random() - 0.5) * 50;  // 最终位置随机偏移
+                
+                // 延迟每个小黄人的出现时间，形成连续效果
+                setTimeout(() => {
+                    createMinion(startX, midX, endX);
+                }, i * 200); // 每个小黄人间隔200ms
+            }
+            
+            // 播放小黄人音效
+            playMinionsSound();
+            
+            // 显示成功文字提示
+            setTimeout(() => {
+                showSuccessMessageMinions();
+            }, 800);
+            
+            // 4秒后自动隐藏小黄人和文字提示
+            setTimeout(() => {
+                minionsContainer.style.display = 'none';
+                hideSuccessMessageMinions();
+            }, 4000);
+        }
+        
+        /**
+         * 创建单个小黄人
+         * @param {number} startX - 起始X坐标
+         * @param {number} midX - 中间X坐标
+         * @param {number} endX - 结束X坐标
+         */
+        function createMinion(startX, midX, endX) {
+            // 创建小黄人容器
+            const minion = document.createElement('div');
+            minion.className = 'minion';
+            
+            // 设置CSS变量用于动画控制
+            minion.style.setProperty('--start-x', `${startX}px`);
+            minion.style.setProperty('--mid-x', `${midX}px`);
+            minion.style.setProperty('--end-x', `${endX}px`);
+            
+            // 应用跳跃动画
+            minion.style.animation = `minion-jump 3s ease-out forwards`;
+            
+            // 创建小黄人身体
+            const body = document.createElement('div');
+            body.className = 'minion-body';
+            
+            // 创建背带裤
+            const overalls = document.createElement('div');
+            overalls.className = 'minion-overalls';
+            
+            // 创建背带
+            const strapLeft = document.createElement('div');
+            strapLeft.className = 'minion-strap left';
+            const strapRight = document.createElement('div');
+            strapRight.className = 'minion-strap right';
+            
+            // 创建头部
+            const head = document.createElement('div');
+            head.className = 'minion-head';
+            
+            // 创建护目镜
+            const goggles = document.createElement('div');
+            goggles.className = 'minion-goggles';
+            const gogglesInner = document.createElement('div');
+            gogglesInner.className = 'goggles-inner';
+            
+            // 创建眼睛
+            const eyeLeft = document.createElement('div');
+            eyeLeft.className = 'minion-eye left';
+            const eyeRight = document.createElement('div');
+            eyeRight.className = 'minion-eye right';
+            
+            // 创建嘴巴
+            const mouth = document.createElement('div');
+            mouth.className = 'minion-mouth';
+            const mouthInner = document.createElement('div');
+            mouthInner.className = 'mouth-inner';
+            
+            // 创建手部
+            const handLeft = document.createElement('div');
+            handLeft.className = 'minion-hand left';
+            // 添加挥手动画
+            handLeft.style.animation = 'minion-wave 1s 1s infinite alternate';
+            
+            const handRight = document.createElement('div');
+            handRight.className = 'minion-hand right';
+            // 添加挥手动画
+            handRight.style.animation = 'minion-wave-right 1s 1.2s infinite alternate';
+            
+            // 创建腿部
+            const legLeft = document.createElement('div');
+            legLeft.className = 'minion-leg left';
+            const legRight = document.createElement('div');
+            legRight.className = 'minion-leg right';
+            
+            // 组装小黄人
+            goggles.appendChild(gogglesInner);
+            gogglesInner.appendChild(eyeLeft);
+            gogglesInner.appendChild(eyeRight);
+            
+            head.appendChild(goggles);
+            head.appendChild(mouth);
+            mouth.appendChild(mouthInner);
+            
+            body.appendChild(strapLeft);
+            body.appendChild(strapRight);
+            body.appendChild(overalls);
+            body.appendChild(handLeft);
+            body.appendChild(handRight);
+            body.appendChild(legLeft);
+            body.appendChild(legRight);
+            
+            minion.appendChild(head);
+            minion.appendChild(body);
+            
+            // 添加到容器
+            minionsContainer.appendChild(minion);
+        }
+        
+        /**
+         * 显示小黄人成功文字提示
+         */
+        function showSuccessMessageMinions() {
+            // 显示成功消息
+            successMessageMinions.style.display = 'block';
+            
+            // 重置动画状态
+            successMessageMinions.style.animation = 'none';
+            successMessageMinions.offsetHeight; // 触发重绘
+            
+            // 应用出现动画
+            successMessageMinions.style.animation = 'minions-text-appear 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards';
+        }
+        
+        /**
+         * 隐藏小黄人成功文字提示
+         */
+        function hideSuccessMessageMinions() {
+            // 先应用消失动画
+            successMessageMinions.style.animation = 'minions-text-disappear 0.5s ease-out forwards';
+            
+            // 动画完成后隐藏元素
+            setTimeout(() => {
+                successMessageMinions.style.display = 'none';
+                successMessageMinions.style.animation = '';
+            }, 500);
+        }
+        
+        /**
+         * 播放小黄人音效
+         */
+        function playMinionsSound() {
+            try {
+                minionsSound.currentTime = 0;
+                const playPromise = minionsSound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('小黄人音效播放失败:', error);
+                    });
+                }
+            } catch (error) {
+                console.log('小黄人音效播放失败:', error);
+            }
+        }
+
+        // ========== 小丑动画函数（失败特效，保留） ==========
+        
+        /**
+         * 创建小丑动画特效
+         */
+        function createClownAnimation() {
+            // 清空小丑容器
+            clownContainer.innerHTML = '';
+            // 显示小丑容器
+            clownContainer.style.display = 'block';
+            
+            // 创建屏幕红色闪烁效果
+            addScreenRedFlash();
+            
+            // 创建小丑面部
+            const clownFace = document.createElement('div');
+            clownFace.className = 'clown-face';
+            
+            // 创建小丑眼睛
+            const leftEye = document.createElement('div');
+            leftEye.className = 'clown-eye left';
+            const leftPupil = document.createElement('div');
+            leftPupil.className = 'clown-pupil';
+            leftEye.appendChild(leftPupil);
+            
+            const rightEye = document.createElement('div');
+            rightEye.className = 'clown-eye right';
+            const rightPupil = document.createElement('div');
+            rightPupil.className = 'clown-pupil';
+            rightEye.appendChild(rightPupil);
+            
+            // 创建小丑鼻子
+            const nose = document.createElement('div');
+            nose.className = 'clown-nose';
+            
+            // 创建小丑嘴巴
+            const mouth = document.createElement('div');
+            mouth.className = 'clown-mouth';
+            const mouthInner = document.createElement('div');
+            mouthInner.className = 'mouth-inner-clown';
+            mouth.appendChild(mouthInner);
+            
+            // 创建小丑帽子
+            const hat = document.createElement('div');
+            hat.className = 'clown-hat';
+            const pompom = document.createElement('div');
+            pompom.className = 'hat-pompom';
+            hat.appendChild(pompom);
+            
+            // 组装小丑
+            clownFace.appendChild(leftEye);
+            clownFace.appendChild(rightEye);
+            clownFace.appendChild(nose);
+            clownFace.appendChild(mouth);
+            clownFace.appendChild(hat);
+            
+            // 添加到容器
+            clownContainer.appendChild(clownFace);
+            
+            // 创建装饰元素
+            createClownDecorations();
+            
+            // 显示失败文字
+            setTimeout(() => {
+                showFailMessage();
+            }, 800);
+            
+            // 3.5秒后自动隐藏小丑和失败提示
+            setTimeout(() => {
+                clownContainer.style.display = 'none';
+                hideFailMessage();
+            }, 3500);
+        }
+        
+        /**
+         * 创建小丑装饰元素
+         */
+        function createClownDecorations() {
+            const decorationCount = 15;
+            
+            for (let i = 0; i < decorationCount; i++) {
+                const decoration = document.createElement('div');
+                decoration.className = 'fail-decoration';
+                
+                // 随机大小
+                const size = 10 + Math.random() * 20;
+                decoration.style.width = `${size}px`;
+                decoration.style.height = `${size}px`;
+                
+                // 随机颜色
+                const colors = ['#ff3366', '#ffcc00', '#3366ff', '#66ff66'];
+                decoration.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 随机位置和动画参数
+                const startX = Math.random() * window.innerWidth;
+                const startY = Math.random() * window.innerHeight;
+                const midX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
+                const midY = window.innerHeight / 2 + (Math.random() - 0.5) * 200;
+                const endX = window.innerWidth / 2 + (Math.random() - 0.5) * 100;
+                const endY = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
+                
+                decoration.style.setProperty('--start-x', `${startX}px`);
+                decoration.style.setProperty('--start-y', `${startY}px`);
+                decoration.style.setProperty('--mid-x', `${midX}px`);
+                decoration.style.setProperty('--mid-y', `${midY}px`);
+                decoration.style.setProperty('--end-x', `${endX}px`);
+                decoration.style.setProperty('--end-y', `${endY}px`);
+                
+                // 随机动画延迟
+                const delay = Math.random() * 0.5;
+                
+                decoration.style.animation = `decoration-fly-in 1.5s ${delay}s forwards`;
+                
+                clownContainer.appendChild(decoration);
+            }
+        }
+        
+        /**
+         * 添加屏幕红色闪烁效果
+         */
+        function addScreenRedFlash() {
+            const flashOverlay = document.createElement('div');
+            flashOverlay.style.position = 'fixed';
+            flashOverlay.style.top = '0';
+            flashOverlay.style.left = '0';
+            flashOverlay.style.width = '100vw';
+            flashOverlay.style.height = '100vh';
+            flashOverlay.style.pointerEvents = 'none';
+            flashOverlay.style.zIndex = '1499'; // 低于小丑
+            flashOverlay.style.animation = 'screen-red-flash 1.5s ease-out forwards';
+            
+            document.body.appendChild(flashOverlay);
+            
+            setTimeout(() => {
+                if (flashOverlay.parentNode) {
+                    flashOverlay.parentNode.removeChild(flashOverlay);
+                }
+            }, 1500);
+        }
+        
+        /**
+         * 显示失败文字提示
+         */
+        function showFailMessage() {
+            // 显示失败消息
+            failMessage.style.display = 'block';
+            
+            // 重置动画状态
+            failMessage.style.animation = 'none';
+            failMessage.offsetHeight;
+            
+            // 应用出现动画
+            failMessage.style.animation = 'fail-text-appear 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards';
+        }
+        
+        /**
+         * 隐藏失败文字提示
+         */
+        function hideFailMessage() {
+            failMessage.style.display = 'none';
+            failMessage.style.animation = '';
+        }
+
+        // ========== 音效播放函数 ==========
+        
+        /**
+         * 播放成功音效
+         */
+        function playSuccessSound() {
+            try {
+                successSound.currentTime = 0;
+                const playPromise = successSound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('成功音效播放失败:', error);
+                    });
+                }
+            } catch (error) {
+                console.log('成功音效播放失败:', error);
+            }
+        }
+        
+        /**
+         * 播放失败音效
+         */
+        function playFailSound() {
+            try {
+                failSound.currentTime = 0;
+                const playPromise = failSound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('失败音效播放失败:', error);
+                    });
+                }
+            } catch (error) {
+                console.log('失败音效播放失败:', error);
+            }
+        }
+
+        // ========== 提交答案处理 ==========
+        
+        /**
+         * 处理提交按钮点击事件
+         */
+        function handleSubmit() {
+            if (submitBtn.disabled) return;
+
+            let isAllCorrect = true;
+
+            // 检查用户答案是否正确
+            for (const [qId, aId] of Object.entries(correctAnswers)) {
+                if (userAnswers[qId] !== aId) {
+                    isAllCorrect = false;
+                    break;
+                }
+            }
+
+            if (isAllCorrect) {
+                // 全部正确 - 显示小黄人特效 + 烟花特效
+                playSuccessSound();
+                createMinionsAnimation(); // 小黄人特效
+                createFireworks(); // 烟花特效（新增）
+                
+                // 4.5秒后重置游戏（比成功情况稍长，与烟花动画同步）
+                setTimeout(resetGame, 4500);
+            } else {
+                // 答案错误 - 显示小丑特效
+                playFailSound();
+                
+                // 移动端震动反馈
+                if (navigator.userAgent.match(/Mobile/) && 'vibrate' in navigator) {
+                    navigator.vibrate([100, 50, 100]); // 更强的震动模式
+                }
+                
+                // 显示小丑动画
+                createClownAnimation();
+                
+                // 3.5秒后重置游戏（比成功情况稍短）
+                setTimeout(resetGame, 3500);
+            }
+        }
+
+        // ========== 游戏重置 ==========
+        
+        /**
+         * 重置游戏到初始状态
+         */
+        function resetGame() {
+            // 移除所有正式连线
+            svgContainer.querySelectorAll('.line-path').forEach(line => line.remove());
+            
+            // 清空用户答案
+            Object.keys(userAnswers).forEach(key => delete userAnswers[key]);
+            
+            // 禁用提交按钮
+            submitBtn.disabled = true;
+            
+            // 重置拖拽状态
+            isDragging = false;
+            startItem = null;
+            
+            // 清理临时连线
+            if (tempLinePath) {
+                tempLinePath.remove();
+                tempLinePath = null;
+            }
+            
+            // 移除所有卡片的样式
+            allCards.forEach(item => {
+                item.classList.remove('dragging', 'selected', 'active-state');
+            });
+            
+            // 隐藏所有特效容器
+            fireworksContainer.style.display = 'none'; // 新增：隐藏烟花容器
+            minionsContainer.style.display = 'none';
+            clownContainer.style.display = 'none';
+            
+            // 隐藏所有文字提示
+            hideSuccessMessageMinions();
+            hideFailMessage();
+        }
+
+        // ========== SVG尺寸适配 ==========
+        
+        /**
+         * 调整SVG尺寸以适应连线区域
+         */
+        function resizeSVG() {
+            const rect = connectArea.getBoundingClientRect();
+            svgContainer.setAttribute('width', rect.width);
+            svgContainer.setAttribute('height', rect.height);
+            redrawExistingLines();
+        }
+
+        /**
+         * 重绘已有的连线
+         */
+        function redrawExistingLines() {
+            svgContainer.querySelectorAll('.line-path').forEach(line => line.remove());
+            
+            for (const [qId, aId] of Object.entries(userAnswers)) {
+                const startItem = document.querySelector(`.left-card[data-id="${qId}"]`);
+                const endItem = document.querySelector(`.right-card[data-answer="${aId}"]`);
+                
+                if (startItem && endItem) {
+                    createCurvedLine(startItem, endItem, qId);
+                    startItem.classList.add('selected');
+                    endItem.classList.add('selected');
+                }
+            }
+        }
+
+        // ========== 页面加载完成初始化 ==========
+        
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
+
+    
